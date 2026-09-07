@@ -1,0 +1,24 @@
+{
+  "schemaVersion": 1,
+  "id": "nomad",
+  "version": "${version}",
+  "name": "Nomad",
+  "description": "Account and proxy switcher",
+  "authors": [
+    "Colin"
+  ],
+  "license": "All-Rights-Reserved",
+  "environment": "client",
+  "entrypoints": {
+    "client": [
+      "nomad.client.Nomad"
+    ]
+  },
+  "mixins": [
+    "nomad.mixins.json"
+  ],
+  "depends": {
+    "fabricloader": ">=0.15.11",
+    "minecraft": "1.19.4"
+  }
+}

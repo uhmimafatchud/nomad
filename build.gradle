@@ -1,0 +1,63 @@
+plugins {
+	id 'net.fabricmc.fabric-loom-remap' version '1.17.12'
+}
+
+base { archivesName = project.archives_base_name }
+version = project.mod_version
+group = project.maven_group
+
+repositories {
+	mavenCentral()
+}
+
+configurations {
+	// Netty ships with vanilla MC, but not the proxy/socks codecs (Socks5ProxyHandler etc.) —
+	// those have to be shaded into the jar ourselves so a production build has them at runtime.
+	shade
+}
+
+dependencies {
+	minecraft "com.mojang:minecraft:${project.minecraft_version}"
+	mappings loom.officialMojangMappings()
+	implementation "net.fabricmc:fabric-loader:${project.loader_version}"
+	implementation "net.fabricmc:sponge-mixin:${project.mixin_version}"
+
+	// 1.19.4 doesn't bundle netty-codec-http, but HttpProxyHandler needs it.
+	shade("io.netty:netty-handler-proxy:${project.netty_version}") { transitive = false }
+	shade("io.netty:netty-codec-socks:${project.netty_version}") { transitive = false }
+	shade("io.netty:netty-codec-http:${project.netty_version}") { transitive = false }
+
+	configurations.shade.dependencies.each { implementation(it) }
+}
+
+processResources {
+	inputs.property "version", project.version
+	filesMatching("fabric.mod.json") {
+		expand "version": project.version
+	}
+}
+
+tasks.withType(JavaCompile).configureEach {
+	it.options.release = 17
+}
+
+java {
+	toolchain {
+		languageVersion = JavaLanguageVersion.of(17)
+	}
+}
+
+jar {
+	from {
+		configurations.shade.collect { it.isDirectory() ? it : zipTree(it) }
+	}
+	duplicatesStrategy(DuplicatesStrategy.EXCLUDE)
+
+	manifest {
+		attributes(
+				'Implementation-Title': project.name,
+				'Implementation-Version': project.version,
+				'Built-By': System.getProperty('user.name'),
+		)
+	}
+}
