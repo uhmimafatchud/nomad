@@ -40,6 +40,7 @@ public final class ProxyManager {
     private static final String TEST_HOST = "1.1.1.1";   // CONNECT target for latency tests
     private static final int    TEST_PORT = 443;
     private static final int    TEST_TIMEOUT_S = 6;
+    private static final long   CONNECT_TIMEOUT_MS = 10_000L;
 
     private final List<ProxyEntry> pool = new ArrayList<>();
     private ProxyEntry activeEntry;
@@ -125,11 +126,15 @@ public final class ProxyManager {
     /** Build the Netty proxy handler for an entry — shared by the test path and the join pipeline. */
     public static ChannelHandler newProxyHandler(ProxyEntry e) {
         InetSocketAddress addr = new InetSocketAddress(e.host, e.port);
-        return switch (e.proto) {
+        io.netty.handler.proxy.ProxyHandler handler = switch (e.proto) {
             case SOCKS5 -> e.hasAuth() ? new Socks5ProxyHandler(addr, e.username, e.password) : new Socks5ProxyHandler(addr);
             case SOCKS4 -> e.hasAuth() ? new Socks4ProxyHandler(addr, e.username) : new Socks4ProxyHandler(addr);
             case HTTP   -> e.hasAuth() ? new HttpProxyHandler(addr, e.username, e.password) : new HttpProxyHandler(addr);
         };
+        // ProxyHandler otherwise has no handshake deadline. A dead or incorrectly configured
+        // proxy can leave Minecraft's Connecting screen spinning forever.
+        handler.setConnectTimeoutMillis(CONNECT_TIMEOUT_MS);
+        return handler;
     }
 
     // ── Encrypted persistence (nomad/proxies.json) ────────────────────────────
