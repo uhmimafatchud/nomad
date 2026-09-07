@@ -15,6 +15,9 @@ import java.util.Map;
 
 /** Minimal vanilla-widget switcher: two tabs, one for Microsoft/offline accounts, one for proxies. */
 public final class NomadScreen extends Screen {
+    private static final int MAX_PROXY_ENDPOINT_LENGTH = 512;
+    private static final int MAX_PROXY_CREDENTIAL_LENGTH = 2048;
+
     private enum Tab { ACCOUNTS, PROXIES }
 
     private final Screen parent;
@@ -104,14 +107,17 @@ public final class NomadScreen extends Screen {
 
     private void initProxies(int y) {
         proxyHostBox = new EditBox(font, width / 2 - 104, y, 208, 20, Component.literal("host:port"));
+        proxyHostBox.setMaxLength(MAX_PROXY_ENDPOINT_LENGTH);
         proxyHostBox.setHint(Component.literal("host:port").withStyle(EditBox.DEFAULT_HINT_STYLE));
         addRenderableWidget(proxyHostBox);
         y += 24;
 
         proxyUserBox = new EditBox(font, width / 2 - 104, y, 100, 20, Component.literal("username"));
+        proxyUserBox.setMaxLength(MAX_PROXY_CREDENTIAL_LENGTH);
         proxyUserBox.setHint(Component.literal("username (optional)").withStyle(EditBox.DEFAULT_HINT_STYLE));
         addRenderableWidget(proxyUserBox);
         proxyPassBox = new EditBox(font, width / 2 + 4, y, 100, 20, Component.literal("password"));
+        proxyPassBox.setMaxLength(MAX_PROXY_CREDENTIAL_LENGTH);
         proxyPassBox.setHint(Component.literal("password (optional)").withStyle(EditBox.DEFAULT_HINT_STYLE));
         proxyPassBox.addFormatter((s, i) -> Component.literal("*".repeat(s.length())).getVisualOrderText());
         addRenderableWidget(proxyPassBox);
