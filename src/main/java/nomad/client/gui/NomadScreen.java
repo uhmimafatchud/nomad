@@ -78,8 +78,11 @@ public final class NomadScreen extends Screen {
             int ry = y + i * 24;
 
             addRenderableWidget(Button.builder(Component.literal(label), b -> {
-                AccountManager.INSTANCE.switchTo(a, err -> status = "Switch failed: " + err);
                 status = active ? "" : "Switching to " + a.name() + "…";
+                AccountManager.INSTANCE.switchTo(a, switched -> {
+                    status = "Switched to " + switched.name();
+                    init();
+                }, err -> status = "Switch failed: " + err);
             }).bounds(width / 2 - 104, ry, 168, 20).build());
 
             addRenderableWidget(Button.builder(Component.literal(pendingDelete == a ? "Confirm" : "X"), b -> {

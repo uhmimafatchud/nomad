@@ -75,7 +75,11 @@ public final class AccountManager {
     public List<Account> getAccounts() { return Collections.unmodifiableList(accounts); }
 
     public boolean isActive(Account a) {
-        return mc().getUser().getName().equalsIgnoreCase(a.name());
+        try {
+            return mc().getUser().getProfileId().equals(UUID.fromString(a.uuid()));
+        } catch (IllegalArgumentException e) {
+            return false;
+        }
     }
 
     public boolean isMsLoginInProgress() { return msLoginThread != null && msLoginThread.isAlive(); }
@@ -98,12 +102,12 @@ public final class AccountManager {
         if (accounts.remove(account)) { accounts.add(0, account); save(); }
     }
 
-    public void switchTo(Account account, Consumer<String> onError) {
-        if (isActive(account)) return;
+    public void switchTo(Account account, Consumer<Account> onSuccess, Consumer<String> onError) {
+        if (isActive(account)) { onSuccess.accept(account); return; }
         try {
             String uuid = UUID.fromString(account.uuid()).toString();
             if (account.isMicrosoft() && account.hasRefreshToken()) {
-                if (msSwitching) return;   // one re-auth at a time
+                if (msSwitching) { onError.accept("another account switch is already in progress"); return; }
                 msSwitching = true;
                 Thread t = new Thread(() -> {
                     try {
@@ -112,13 +116,23 @@ public final class AccountManager {
                         String[] xsts   = xstsAuth(xbl[0]);
                         String mcToken  = mcAuth(xsts[0], xsts[1]);
                         User u = new User(account.name(), uuid, mcToken, Optional.empty(), Optional.empty(), User.Type.MSA);
-                        mc().execute(() -> setSession(u));
-                        LOG.info("Switched to MS account: {}", account.name());
+                        mc().execute(() -> {
+                            try {
+                                setSession(u);
+                                onSuccess.accept(account);
+                                LOG.info("Switched to MS account: {}", account.name());
+                            } catch (Exception e) {
+                                String why = e.getMessage() == null ? "session swap failed" : e.getMessage();
+                                LOG.warn("Session swap failed: {}", why);
+                                onError.accept(why);
+                            } finally {
+                                msSwitching = false;
+                            }
+                        });
                     } catch (Exception e) {
                         String why = e.getMessage() == null ? "Microsoft re-auth failed" : e.getMessage();
                         LOG.warn("MS re-auth failed (session unchanged): {}", why);
                         mc().execute(() -> onError.accept(why));
-                    } finally {
                         msSwitching = false;
                     }
                 }, "nomad-ms-switch");
@@ -126,6 +140,7 @@ public final class AccountManager {
                 t.start();
             } else {
                 setSession(new User(account.name(), uuid, "", Optional.empty(), Optional.empty(), User.Type.LEGACY));
+                onSuccess.accept(account);
                 LOG.info("Switched to {} ({})", account.name(), account.type());
             }
         } catch (Exception e) {
